@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pesu Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Lexend:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: a game board. Sticky score bar on top, tab rail, then one focused panel (map, mission, or library). */
+:root {
+  --bg: #EDF2F8; --surface: #FFFFFF; --sunk: #E1E9F3; --ink: #15223A; --muted: #56688A; --line: #CBD6E5;
+  --accent: #F2A900; --accent-ink: #3A2700; --good: #23925F; --bad: #D9481F; --info: #2F6FDB;
+  --w1: #3BAA6E; --w2: #2F8FD8; --w3: #9B5BD6; --w4: #E0821F; --w5: #D9415B;
+  --display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Lexend", "Segoe UI", system-ui, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1524; --surface: #172138; --sunk: #111A2D; --ink: #E7EDF7; --muted: #9AAAC4; --line: #2A3754;
+  --accent: #FFC234; --accent-ink: #2A1C00; --good: #48C48C; --bad: #FF7B5A; --info: #6EA2FF;
+  --w1: #4CC383; --w2: #4BA6EE; --w3: #B47FEA; --w4: #F29A3D; --w5: #F06279; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1524; --surface: #172138; --sunk: #111A2D; --ink: #E7EDF7; --muted: #9AAAC4; --line: #2A3754;
+  --accent: #FFC234; --accent-ink: #2A1C00; --good: #48C48C; --bad: #FF7B5A; --info: #6EA2FF;
+  --w1: #4CC383; --w2: #4BA6EE; --w3: #B47FEA; --w4: #F29A3D; --w5: #F06279; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.6 var(--body); margin: 0 }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface) }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0 }
+button { font: inherit; color: inherit; cursor: pointer }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline-offset: 2px }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+
+/* Score bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line) }
+.bar .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap }
+.logo { font: 800 24px/1 var(--display); letter-spacing: -.5px; display: flex; align-items: center; gap: 8px }
+.logo b { background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 2px 8px 0 }
+.stats { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--sunk); font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap }
+.xpbar { height: 6px; background: var(--sunk); border-radius: 9px; overflow: hidden; width: 100%; flex-basis: 100% }
+.xpbar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .6s }
+
+.tabs { display: flex; gap: 6px; overflow-x: auto; padding-block: 12px; scrollbar-width: none }
+.tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-weight: 500; white-space: nowrap }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+main { padding-block: 4px 60px }
+
+/* Map */
+.hero { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; margin-bottom: 22px }
+.hero h1 { font-size: clamp(24px, 4vw, 34px) }
+.hero p { margin: 4px 0 0; color: var(--muted) }
+.world { margin-bottom: 26px }
+.world-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px }
+.world-head h2 { font-size: 22px; color: var(--wc) }
+.world-head span { color: var(--muted); font-size: 13px }
+.path { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px }
+.tile { position: relative; border: 2px solid var(--line); background: var(--surface); border-radius: 16px; padding: 10px 8px 8px; text-align: center; min-height: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .15s }
+.tile .n { font: 800 26px/1 var(--display); color: var(--wc) }
+.tile .t { font-size: 11px; line-height: 1.25; color: var(--muted) }
+.tile:not(:disabled):hover { transform: translateY(-3px) }
+.tile.done { background: var(--wc); border-color: var(--wc) }
+.tile.done .n, .tile.done .t { color: #fff }
+.tile.next { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); animation: bob 1.6s ease-in-out infinite }
+.tile:disabled { opacity: .45; cursor: not-allowed }
+.tile .lock { position: absolute; top: 6px; right: 8px; font-size: 12px }
+@keyframes bob { 50% { transform: translateY(-4px) } }
+
+/* Buttons */
+.btn { border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 600; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 55%, #000) }
+.btn:active { transform: translateY(2px); box-shadow: none }
+.btn.ghost { background: var(--sunk); color: var(--ink); box-shadow: none }
+.btn:disabled { opacity: .5; cursor: not-allowed }
+.say { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; width: 34px; height: 34px; flex: none; display: inline-grid; place-items: center; font-size: 15px }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center }
+
+/* Mission */
+.mission-top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px }
+.mission-top h1 { font-size: clamp(24px, 4vw, 32px) }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--wc); font-weight: 600 }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 18px }
+.steps button { border: 0; background: var(--sunk); border-radius: 10px; padding: 8px 4px; font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.2 }
+.steps button b { display: block; font: 700 15px/1.1 var(--display); color: var(--ink) }
+.steps button.on { background: var(--ink); color: var(--bg) } .steps button.on b { color: var(--bg) }
+.steps button.ok { background: color-mix(in srgb, var(--good) 22%, var(--surface)) }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 16px }
+.panel h2 { font-size: 24px }
+.lead { color: var(--muted); margin: -8px 0 0 }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; min-width: 0 }
+.card .w { display: flex; justify-content: space-between; gap: 8px; align-items: center }
+.card .w strong { font: 700 21px/1.1 var(--display) }
+.card .m { color: var(--wc); font-weight: 500 }
+.card .e { font-style: italic; color: var(--muted); font-size: 14px }
+.vt { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+.vt th, .vt td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top }
+.vt th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600 }
+.vt td.v { font: 700 17px/1.2 var(--display) }
+.scroll { overflow-x: auto }
+.story p { margin: 0 0 10px; max-width: 68ch }
+.formula { background: var(--sunk); border-left: 5px solid var(--wc); border-radius: 10px; padding: 12px 14px; font-weight: 600; overflow-wrap: anywhere }
+.ex { display: grid; gap: 8px }
+.ex div { display: flex; gap: 10px; align-items: flex-start }
+.ex p { margin: 0; min-width: 0 } .ex small { display: block; color: var(--muted) }
+.tip { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); border-radius: 10px; padding: 12px 14px }
+.tip b { font-family: var(--display) }
+.drill { display: grid; gap: 10px }
+.drill .qline { font-weight: 500 }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px }
+.opt { border: 2px solid var(--line); background: var(--surface); border-radius: 12px; padding: 10px 12px; text-align: left; font-weight: 500 }
+.opt:hover:not(:disabled) { border-color: var(--info) }
+.opt.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 18%, var(--surface)) }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 15%, var(--surface)) }
+.opt:disabled { cursor: default }
+.why { font-size: 14px; color: var(--muted) }
+textarea { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; background: var(--bg); color: var(--ink); resize: vertical }
+.mic { width: 64px; height: 64px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 26px; flex: none }
+.mic.live { animation: pulse 1s infinite }
+@keyframes pulse { 50% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--bad) 25%, transparent) } }
+.note { font-size: 13px; color: var(--muted) }
+.fb { white-space: pre-wrap; background: var(--sunk); border-radius: 12px; padding: 14px; font-size: 14px }
+.keys { display: flex; gap: 6px; flex-wrap: wrap }
+.keys span { font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--sunk) }
+.keys span.hit { background: var(--good); color: #fff }
+.nav { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap }
+.qcount { font: 700 14px var(--display); color: var(--muted) }
+.big { font: 700 22px/1.3 var(--display) }
+.win { text-align: center; display: grid; gap: 10px; justify-items: center; padding: 10px 0 }
+.win .trophy { font-size: 64px; animation: pop .6s ease-out }
+@keyframes pop { 0% { transform: scale(.3) } 70% { transform: scale(1.2) } }
+
+/* Library */
+.search { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font: inherit; background: var(--surface); color: var(--ink); margin-bottom: 14px }
+details.lesson { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px }
+details.lesson summary { padding: 12px 16px; cursor: pointer; font-weight: 600; display: flex; gap: 10px; align-items: baseline }
+details.lesson summary span { color: var(--muted); font-weight: 400; font-size: 13px }
+details.lesson > div { padding: 0 16px 16px; display: grid; gap: 12px }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px }
+.badge { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; text-align: center; display: grid; gap: 4px }
+.badge .ic { font-size: 38px; filter: grayscale(1); opacity: .35 }
+.badge.got .ic { filter: none; opacity: 1 }
+.badge b { font-family: var(--display); font-size: 17px }
+.badge small { color: var(--muted); line-height: 1.3 }
+.flash { display: grid; gap: 14px; justify-items: start }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 600; z-index: 20; max-width: calc(100% - 32px); text-align: center }
+@media (max-width: 560px) {
+  .hero { grid-template-columns: 1fr }
+  .steps button { font-size: 0 } .steps button b { font-size: 14px }
+  .panel { padding: 16px }
+  .stats { margin-left: 0 }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+[hidden] { display: none !important }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="logo"><b>Pesu</b> Quest</div>
+    <div class="stats">
+      <span class="chip" id="chipLevel">Lv 1</span>
+      <span class="chip" id="chipXp">0 XP</span>
+      <span class="chip" id="chipStreak">🔥 0</span>
+      <span class="chip" id="chipDays">0/45</span>
+    </div>
+    <div class="xpbar" aria-hidden="true"><i id="xpFill"></i></div>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="tabs" id="tabs" aria-label="Sections">
+    <button data-tab="map" aria-pressed="true">🗺️ Map</button>
+    <button data-tab="words" aria-pressed="false">📚 Words</button>
+    <button data-tab="verbs" aria-pressed="false">⚡ V1 V2 V3</button>
+    <button data-tab="grammar" aria-pressed="false">🧩 Grammar</button>
+    <button data-tab="badges" aria-pressed="false">🏅 Badges</button>
+  </nav>
+  <main id="app"></main>
+</div>
+
+<script src="verbs.js"></script>
+<script src="days1.js"></script>
+<script src="days2.js"></script>
+<script src="days3.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
